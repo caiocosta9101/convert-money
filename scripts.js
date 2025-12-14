@@ -1,10 +1,13 @@
-//cotação de moedas do dia 
-const USD = 4.87
-const EUR = 5.32
-const GBP = 6.08
+// 1. Lista de Moedas
+const moedas = [
+    { code: "USD", name: "Dólar Americano", symbol: "US$" },
+    { code: "EUR", name: "Euro", symbol: "€" },
+    { code: "GBP", name: "Libra Esterlina", symbol: "£" },
+    { code: "BTC", name: "Bitcoin", symbol: "BTC" },
+    { code: "ARS", name: "Peso Argentino", symbol: "$" }
+]
 
-
-// obtendo os elementos do formulário
+// Obtendo os elementos do formulário
 const form = document.querySelector("form")
 const amount = document.getElementById("amount")
 const currency = document.getElementById("currency")
@@ -12,65 +15,85 @@ const footer = document.querySelector("main footer")
 const description = document.getElementById("description")
 const result = document.getElementById("result")
 
-// manipulando o input amount para receber somente números.
+// Preenchendo o Select Automaticamente
+// Percorre a lista 'moedas' e cria as opções no HTML
+moedas.forEach(item => {
+    const option = document.createElement("option")
+    option.value = item.code // Define o valor (Ex: USD)
+    option.textContent = item.name // Define o texto (Ex: Dólar Americano)
+    currency.appendChild(option) // Adiciona ao <select>
+})
+
+// Manipulando o input amount para receber somente números
 amount.addEventListener("input", () => {
     const hasCharactersRegex = /\D+/g
     amount.value = amount.value.replace(hasCharactersRegex, "")
 })
 
-// captando o evento de submit (enviar) do formulário
-form.onsubmit = (event) => {
+// O evento de submit Assíncrono
+form.onsubmit = async (event) => {
     event.preventDefault()
 
-    switch (currency.value){
-        case "USD":
-            convertCurrency(amount.value, USD, "US$")
-            break
-        case "EUR":
-            convertCurrency(amount.value, EUR, "€")
-            break
-        case "GBP":
-            convertCurrency(amount.value, GBP, "£")
-            break
+    const code = currency.value 
+    
+    // Se o usuário tentar enviar sem selecionar nada (embora o HTML bloqueie)
+    if(!code) return
+
+    // Monta o par para a API (Ex: USDBRL)
+    const apiPair = `${code}-BRL` 
+
+    try {
+        description.textContent = "Obtendo cotação..."
         
+        // Requisição na API
+        const response = await fetch(`https://economia.awesomeapi.com.br/last/${apiPair}`)
+        const data = await response.json()
+
+        // Acessa a cotação
+        const key = code + "BRL"
+        const exchangeRate = data[key].bid
+
+        // Procura na nossa lista 'moedas' qual tem o código igual ao selecionado
+        // para pegar o símbolo correto
+        const itemMoeda = moedas.find(m => m.code === code)
+        const symbol = itemMoeda.symbol
+
+        // Converte
+        convertCurrency(amount.value, Number(exchangeRate), symbol)
+
+    } catch (error) {
+        console.error(error)
+        alert("Não foi possível buscar a cotação. Tente mais tarde.")
+        footer.classList.remove("show-result")
     }
 }
 
-//função para converter a moeda.
-function convertCurrency(amount, price, symbol){
-  try {
-    // exibindo a cotação da moeda selecionada
-    description.textContent = `${symbol} 1 = ${formatCurrencyBRL(price)}`
+// Função para converter (Mantida igual)
+function convertCurrency(amount, price, symbol) {
+    try {
+        description.textContent = `${symbol} 1 = ${formatCurrencyBRL(price)}`
+        
+        let total = amount * price
+        
+        if(isNaN(total)) {
+            return alert("Por favor, digite um valor válido.")
+        }
 
-    // calcula o total
-    let total = amount * price
-
-    //formatar o valor total
-    total = formatCurrencyBRL(total).replace("R$", "")
-
-    // exibe o resultado total
-
-    result.textContent = `${total} reais`
-
-    // aplica a classe que exibe o footer para mostrar o resultado
-    footer.classList.add("show-result")
-  } catch (error) {
-    console.log(error)
-    // remove a classe do footer removendo ele da tela
-    footer.classList.remove("show-result")
-
-    console.log(error)
-    alert("não foi possível converter. tente novamente mais tarde")
-  }
-     
+        total = formatCurrencyBRL(total).replace("R$", "")
+        result.textContent = `${total} reais`
+        
+        footer.classList.add("show-result")
+    } catch (error) {
+        console.log(error)
+        footer.classList.remove("show-result")
+        alert("Erro ao calcular.")
+    }
 }
-// formata a moeda em real brasileiro
+
+// Formata para Real Brasileiro
 function formatCurrencyBRL(value) {
-  // converte para o número para utilizar o toLocaleString para formatar no padrão brl
-  return Number(value).toLocaleString("pt-BR",{
-    style: "currency", 
-    currency: "BRL",
-  })
-
+    return Number(value).toLocaleString("pt-BR", {
+        style: "currency",
+        currency: "BRL",
+    })
 }
-
